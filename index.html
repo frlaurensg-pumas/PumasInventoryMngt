@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hockey Stock - Gestion des Remises & Scanner QR</title>
+    <!-- Tailwind CSS pour un design premium -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Bibliothèque de scan QR code gratuite, robuste et sans publicité -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        .tab-active {
+            border-bottom-color: #2563eb;
+            color: #2563eb;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col text-slate-800 font-sans">
+
+    <!-- HEADER -->
+    <header class="bg-slate-900 text-white shadow-md flex-shrink-0">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-blue-600 p-2 rounded-lg flex items-center justify-center">
+                        <i data-lucide="shield-alert" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold leading-none">HOCKEY CLUB</h1>
+                        <span class="text-xs text-slate-400 font-medium">Distribution & Scanner QR v1.3</span>
+                    </div>
+                </div>
+                
+                <!-- Indicateur de Connexion Base de Données Cloud -->
+                <div class="flex items-center space-x-2 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span id="db-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span id="db-indicator" class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                    </span>
+                    <span id="db-status-text" class="text-xs font-semibold text-slate-300">Connexion base...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- NAVIGATION PAR ONGLETS -->
+    <div class="bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <nav class="flex space-x-8 -mb-px">
+                <button onclick="switchTab('comptoir1')" id="tab-comptoir1" class="tab-active border-b-2 border-transparent py-4 px-1 text-sm font-medium flex items-center space-x-2 transition-all">
+                    <i data-lucide="user-plus" class="w-5 h-5"></i>
+                    <span>Comptoir 1 : Accueil & Mensuration</span>
+                </button>
+                <button onclick="switchTab('comptoir2')" id="tab-comptoir2" class="border-b-2 border-transparent py-4 px-1 text-sm font-medium flex items-center space-x-2 transition-all text-slate-500 hover:text-slate-700 hover:border-slate-300">
+                    <i data-lucide="package-check" class="w-5 h-5"></i>
+                    <span>Comptoir 2 : Remise de Matériel</span>
+                </button>
+                <button onclick="switchTab('inventaire')" id="tab-inventaire" class="border-b-2 border-transparent py-4 px-1 text-sm font-medium flex items-center space-x-2 transition-all text-slate-500 hover:text-slate-700 hover:border-slate-300">
+                    <i data-lucide="boxes" class="w-5 h-5"></i>
+                    <span>Gestion de l'Inventaire</span>
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+        
+        <!-- TOAST NOTIFICATIONS -->
+        <div id="toast" class="hidden fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 border border-slate-800 transition-all transform translate-y-10 opacity-0">
+            <div id="toast-icon-wrapper" class="p-1 rounded bg-green-500">
+                <i data-lucide="check" class="w-4 h-4 text-white"></i>
+            </div>
+            <p id="toast-msg" class="text-sm font-medium"></p>
+        </div>
+
+        <!-- SECTION COMPTOIR 1 -->
+        <section id="sec-comptoir1" class="space-y-6">
+            <div class="md:flex md:items-center md:justify-between">
+                <div class="flex-1 min-w-0">
+                    <h2 class="text-2xl font-bold text-slate-900 sm:text-3xl">Comptoir 1 : Accueil Adhérent</h2>
+                    <p class="mt-1 text-sm text-slate-500">Saisissez l'identité et mesurez les tailles de l'adhérent. Les informations seront synchronisées instantanément.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Formulaire -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6 lg:col-span-1">
+                    <h3 class="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                        <i data-lucide="clipboard-list" class="text-blue-600"></i>
+                        <span>Fiche d'Inscription</span>
+                    </h3>
+                    
+                    <form id="form-inscription" class="space-y-4" onsubmit="enregistrerAdherent(event)">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label for="c1-prenom" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Prénom</label>
+                                <input type="text" id="c1-prenom" required placeholder="Ex: Lucas" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="c1-nom" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Nom</label>
+                                <input type="text" id="c1-nom" required placeholder="Ex: Bernard" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="c1-dob" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Date de Naissance</label>
+                            <input type="date" id="c1-dob" required class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <!-- Affichage de la catégorie auto-calculée -->
+                            <div id="c1-cat-auto" class="hidden mt-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md inline-block border border-blue-100"></div>
+                        </div>
+
+                        <div class="border-t border-slate-100 my-4 pt-4">
+                            <span class="block text-sm font-bold text-slate-900 mb-3 flex items-center space-x-2">
+                                <i data-lucide="ruler" class="w-4 h-4 text-slate-400"></i>
+                                <span>Mensurations</span>
+                            </span>
+                            
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label for="c1-taille-casque" class="block text-xs font-semibold text-slate-500 mb-1">Casque</label>
+                                    <select id="c1-taille-casque" required class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white">
+                                        <option value="S">S</option>
+                                        <option value="M" selected>M</option>
+                                        <option value="L">L</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="c1-taille-plastron" class="block text-xs font-semibold text-slate-500 mb-1">Plastron</label>
+                                    <select id="c1-taille-plastron" required class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white">
+                                        <option value="XS">XS</option>
+                                        <option value="S">S</option>
+                                        <option value="M" selected>M</option>
+                                        <option value="L">L</option>
+                                        <option value="XL">XL</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="c1-taille-coudieres" class="block text-xs font-semibold text-slate-500 mb-1">Coudières</label>
+                                    <select id="c1-taille-coudieres" required class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white">
+                                        <option value="XS">XS</option>
+                                        <option value="S">S</option>
+                                        <option value="M" selected>M</option>
+                                        <option value="L">L</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="c1-taille-culotte" class="block text-xs font-semibold text-slate-500 mb-1">Culotte</label>
+                                    <select id="c1-taille-culotte" required class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white">
+                                        <option value="XS">XS</option>
+                                        <option value="S">S</option>
+                                        <option value="M" selected>M</option>
+                                        <option value="L">L</option>
+                                        <option value="XL">XL</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="c1-taille-jambieres" class="block text-xs font-semibold text-slate-500 mb-1">Jambières</label>
+                                    <select id="c1-taille-jambieres" required class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white">
+                                        <option value="9&quot;">9"</option>
+                                        <option value="10&quot;">10"</option>
+                                        <option value="11&quot;" selected>11"</option>
+                                        <option value="12&quot;">12"</option>
+                                        <option value="13&quot;">13"</option>
+                                        <option value="14&quot;">14"</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="c1-taille-patins" class="block text-xs font-semibold text-slate-500 mb-1">Patins</label>
+                                    <select id="c1-taille-patins" required class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white">
+                                        <!-- Généré par JS (26 à 46) -->
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md flex items-center justify-center space-x-2">
+                            <i data-lucide="user-plus" class="w-5 h-5"></i>
+                            <span>Envoyer au Comptoir 2</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Liste File d'attente -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-2 flex flex-col h-[520px]">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                            <i data-lucide="users" class="text-indigo-600"></i>
+                            <span>File d'attente active</span>
+                        </h3>
+                        <span id="badge-file-attente" class="bg-slate-100 text-slate-800 text-xs px-2.5 py-1 rounded-full font-bold">0 Adhérents</span>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto border border-slate-100 rounded-xl">
+                        <table class="min-w-full divide-y divide-slate-100">
+                            <thead class="bg-slate-50 text-xs font-bold text-slate-500 uppercase">
+                                <tr>
+                                    <th class="px-6 py-3 text-left">Adhérent</th>
+                                    <th class="px-6 py-3 text-center">Tailles cibles</th>
+                                    <th class="px-6 py-3 text-center">Date & Heure Inscription</th>
+                                    <th class="px-6 py-3 text-center">Statut</th>
+                                    <th class="px-6 py-3 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-file-attente" class="bg-white divide-y divide-slate-100"></tbody>
+                        </table>
+                        <div id="file-attente-vide" class="text-center py-16 text-slate-400 flex flex-col items-center justify-center space-y-2">
+                            <i data-lucide="smile" class="w-12 h-12 stroke-1"></i>
+                            <p class="font-medium">Aucun adhérent dans la file d'attente.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION COMPTOIR 2 (AVEC MODULE SCANNER) -->
+        <section id="sec-comptoir2" class="space-y-6 hidden">
+            <div class="md:flex md:items-center md:justify-between">
+                <div class="flex-1 min-w-0">
+                    <h2 class="text-2xl font-bold text-slate-900 sm:text-3xl">Comptoir 2 : Remise de Matériel</h2>
+                    <p class="mt-1 text-sm text-slate-500">Liez le matériel physique en le sélectionnant ou en scannant son QR Code.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Liste des adhérents à servir -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-1 flex flex-col h-[650px]">
+                    <h3 class="text-lg font-bold text-slate-900 flex items-center space-x-2 mb-4">
+                        <i data-lucide="hourglass-split" class="text-amber-500"></i>
+                        <span>En attente de matériel</span>
+                    </h3>
+                    <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="comptoir2-liste-attente"></div>
+                </div>
+
+                <!-- Zone de distribution / Scanner -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-2 flex flex-col h-[650px]">
+                    <div id="c2-aucun-selectionne" class="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-3">
+                        <div class="bg-slate-50 p-4 rounded-full">
+                            <i data-lucide="package-open" class="w-12 h-12 text-slate-300"></i>
+                        </div>
+                        <p class="font-semibold text-slate-500">Sélectionnez un adhérent à gauche pour commencer.</p>
+                    </div>
+
+                    <div id="c2-panneau-distribution" class="hidden flex-1 flex flex-col">
+                        <!-- Infos de l'adhérent -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between mb-4 flex-shrink-0">
+                            <div>
+                                <span class="text-xs font-bold text-blue-600 uppercase tracking-widest" id="c2-focus-cat"></span>
+                                <h4 class="text-lg font-bold text-slate-900" id="c2-focus-nom"></h4>
+                            </div>
+                            <div class="text-right text-xs text-slate-400">
+                                <span>Inscrit le : </span>
+                                <span class="font-semibold text-slate-700 block text-sm" id="c2-focus-heure"></span>
+                            </div>
+                        </div>
+
+                        <!-- CAMERA DE SCAN QR CODE EN TEMPS REEL -->
+                        <div id="c2-scanner-container" class="hidden bg-slate-900 p-4 rounded-xl relative mb-4 flex-shrink-0">
+                            <div class="flex items-center justify-between text-white mb-2">
+                                <span class="text-xs font-bold flex items-center gap-1.5">
+                                    <span class="flex h-2 w-2 relative">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                    </span>
+                                    Caméra de scan active (<span id="scan-target-label" class="text-blue-400">Casque</span>)
+                                </span>
+                                <button onclick="fermerScanner()" class="text-slate-400 hover:text-white transition-colors">
+                                    <i data-lucide="x-circle" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                            <!-- Zone d'affichage du flux de la caméra -->
+                            <div id="reader" class="overflow-hidden rounded-lg mx-auto bg-black" style="max-width: 320px;"></div>
+                        </div>
+
+                        <!-- Éléments à distribuer -->
+                        <div class="flex-1 overflow-y-auto space-y-3 pr-1">
+                            <!-- Ligne CASQUE -->
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white border border-slate-200 rounded-xl gap-3">
+                                <div class="flex items-center space-x-3">
+                                    <div class="bg-blue-50 text-blue-600 p-2 rounded-lg">
+                                        <i data-lucide="hard-hat" class="w-5 h-5"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="font-bold text-xs text-slate-800">Casque de protection</h6>
+                                        <span class="text-xs text-slate-500">Requis : <strong class="text-blue-600 font-bold" id="c2-req-casque"></strong></span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <select id="c2-select-casque" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-slate-50 w-36 font-mono"></select>
+                                    <button onclick="validerEquipement('casque')" class="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded-lg transition-colors"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                    <button onclick="ouvrirScanner('casque')" class="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded-lg transition-colors" title="Scanner le QR Code"><i data-lucide="qr-code" class="w-4 h-4"></i></button>
+                                </div>
+                            </div>
+
+                            <!-- Ligne PLASTRON -->
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white border border-slate-200 rounded-xl gap-3">
+                                <div class="flex items-center space-x-3">
+                                    <div class="bg-red-50 text-red-600 p-2 rounded-lg">
+                                        <i data-lucide="shirt" class="w-5 h-5"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="font-bold text-xs text-slate-800">Plastron</h6>
+                                        <span class="text-xs text-slate-500">Requis : <strong class="text-red-600 font-bold" id="c2-req-plastron"></strong></span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <select id="c2-select-plastron" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-slate-50 w-36 font-mono"></select>
+                                    <button onclick="validerEquipement('plastron')" class="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded-lg transition-colors"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                    <button onclick="ouvrirScanner('plastron')" class="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded-lg transition-colors" title="Scanner le QR Code"><i data-lucide="qr-code" class="w-4 h-4"></i></button>
+                                </div>
+                            </div>
+
+                            <!-- Ligne COUDIÈRES -->
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white border border-slate-200 rounded-xl gap-3">
+                                <div class="flex items-center space-x-3">
+                                    <div class="bg-purple-50 text-purple-600 p-2 rounded-lg">
+                                        <i data-lucide="shield-alert" class="w-5 h-5"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="font-bold text-xs text-slate-800">Coudières</h6>
+                                        <span class="text-xs text-slate-500">Requis : <strong class="text-purple-600 font-bold" id="c2-req-coudieres"></strong></span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <select id="c2-select-coudieres" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-slate-50 w-36 font-mono"></select>
+                                    <button onclick="validerEquipement('coudieres')" class="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded-lg transition-colors"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                    <button onclick="ouvrirScanner('coudieres')" class="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded-lg transition-colors" title="Scanner le QR Code"><i data-lucide="qr-code" class="w-4 h-4"></i></button>
+                                </div>
+                            </div>
+
+                            <!-- Ligne CULOTTE -->
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white border border-slate-200 rounded-xl gap-3">
+                                <div class="flex items-center space-x-3">
+                                    <div class="bg-emerald-50 text-emerald-600 p-2 rounded-lg">
+                                        <i data-lucide="pocket" class="w-5 h-5"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="font-bold text-xs text-slate-800">Culotte de hockey</h6>
+                                        <span class="text-xs text-slate-500">Requis : <strong class="text-emerald-600 font-bold" id="c2-req-culotte"></strong></span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <select id="c2-select-culotte" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-slate-50 w-36 font-mono"></select>
+                                    <button onclick="validerEquipement('culotte')" class="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded-lg transition-colors"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                    <button onclick="ouvrirScanner('culotte')" class="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded-lg transition-colors" title="Scanner le QR Code"><i data-lucide="qr-code" class="w-4 h-4"></i></button>
+                                </div>
+                            </div>
+
+                            <!-- Ligne JAMBIÈRES -->
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white border border-slate-200 rounded-xl gap-3">
+                                <div class="flex items-center space-x-3">
+                                    <div class="bg-indigo-50 text-indigo-600 p-2 rounded-lg">
+                                        <i data-lucide="shield" class="w-5 h-5"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="font-bold text-xs text-slate-800">Jambières</h6>
+                                        <span class="text-xs text-slate-500">Requis : <strong class="text-indigo-600 font-bold" id="c2-req-jambieres"></strong></span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <select id="c2-select-jambieres" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-slate-50 w-36 font-mono"></select>
+                                    <button onclick="validerEquipement('jambieres')" class="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded-lg transition-colors"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                    <button onclick="ouvrirScanner('jambieres')" class="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded-lg transition-colors" title="Scanner le QR Code"><i data-lucide="qr-code" class="w-4 h-4"></i></button>
+                                </div>
+                            </div>
+
+                            <!-- Ligne PATINS -->
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white border border-slate-200 rounded-xl gap-3">
+                                <div class="flex items-center space-x-3">
+                                    <div class="bg-cyan-50 text-cyan-600 p-2 rounded-lg">
+                                        <i data-lucide="footprints" class="w-5 h-5"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="font-bold text-xs text-slate-800">Patins à glace</h6>
+                                        <span class="text-xs text-slate-500">Requis : <strong class="text-cyan-600 font-bold" id="c2-req-patins"></strong></span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <select id="c2-select-patins" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-slate-50 w-36 font-mono"></select>
+                                    <button onclick="validerEquipement('patins')" class="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded-lg transition-colors"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                    <button onclick="ouvrirScanner('patins')" class="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded-lg transition-colors" title="Scanner le QR Code"><i data-lucide="qr-code" class="w-4 h-4"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pied de panneau -->
+                        <div class="border-t border-slate-100 pt-3 mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 flex-shrink-0">
+                            <div>
+                                <span class="text-xs text-slate-400 block font-medium">Progression distribution</span>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-32 bg-slate-100 rounded-full h-2">
+                                        <div id="c2-barre-progression" class="bg-emerald-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                                    </div>
+                                    <span class="text-xs font-bold text-slate-600" id="c2-texte-progression">0/6 attribué</span>
+                                </div>
+                            </div>
+                            <button onclick="cloturerDossierAdherent()" class="bg-slate-950 hover:bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-semibold flex items-center justify-center space-x-2 transition-all">
+                                <i data-lucide="check-square" class="w-4 h-4"></i>
+                                <span>Valider la Remise</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- GESTION DE L'INVENTAIRE -->
+        <section id="sec-inventaire" class="space-y-6 hidden">
+            <!-- Stats -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="bg-blue-50 text-blue-600 p-3 rounded-xl"><i data-lucide="boxes" class="w-6 h-6"></i></div>
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase block">Total Éléments</span>
+                        <span id="stat-total" class="text-2xl font-bold text-slate-950">0</span>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="bg-emerald-50 text-emerald-600 p-3 rounded-xl"><i data-lucide="check-circle" class="w-6 h-6"></i></div>
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase block">Disponibles</span>
+                        <span id="stat-dispo" class="text-2xl font-bold text-slate-950">0</span>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="bg-amber-50 text-amber-600 p-3 rounded-xl"><i data-lucide="package" class="w-6 h-6"></i></div>
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase block">Attribués</span>
+                        <span id="stat-attribues" class="text-2xl font-bold text-slate-950">0</span>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                    <div class="bg-rose-50 text-rose-600 p-3 rounded-xl"><i data-lucide="alert-triangle" class="w-6 h-6"></i></div>
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase block">Taux d'utilisation</span>
+                        <span id="stat-taux" class="text-2xl font-bold text-slate-950">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ajout & Liste -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Enregistrer -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-1 space-y-4">
+                    <h3 class="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                        <i data-lucide="plus-circle" class="text-emerald-500"></i>
+                        <span>Enregistrer un Équipement</span>
+                    </h3>
+                    <form id="form-stock" onsubmit="ajouterEquipement(event)" class="space-y-4">
+                        <div>
+                            <label for="st-id" class="block text-xs font-semibold text-slate-500 uppercase mb-1">ID Unique (Inscrit sur le QR Code)</label>
+                            <input type="text" id="st-id" required placeholder="Ex: CASQ-01" class="w-full px-3 py-2 border border-slate-200 rounded-lg font-mono">
+                        </div>
+                        <div>
+                            <label for="st-type" class="block text-xs font-semibold text-slate-500 uppercase mb-1">Type</label>
+                            <select id="st-type" required class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white" onchange="majChoixTaillesStock()">
+                                <option value="casque">Casque</option>
+                                <option value="plastron">Plastron</option>
+                                <option value="coudieres">Coudières</option>
+                                <option value="culotte">Culotte</option>
+                                <option value="jambieres">Jambières</option>
+                                <option value="patins">Patins</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="st-taille" class="block text-xs font-semibold text-slate-500 uppercase mb-1">Taille</label>
+                            <select id="st-taille" required class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white"></select>
+                        </div>
+                        <div>
+                            <label for="st-etat" class="block text-xs font-semibold text-slate-500 uppercase mb-1">État</label>
+                            <select id="st-etat" required class="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white">
+                                <option value="Neuf">Neuf</option>
+                                <option value="Excellent état">Excellent état</option>
+                                <option value="Bon état" selected>Bon état</option>
+                                <option value="Usagé">Usagé</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md transition-colors flex items-center justify-center space-x-2">
+                            <i data-lucide="save" class="w-5 h-5"></i>
+                            <span>Ajouter au stock actif</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Liste -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-2 flex flex-col h-[520px]">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                            <i data-lucide="table-properties" class="text-slate-600"></i>
+                            <span>Liste complète des équipements</span>
+                        </h3>
+                        <input type="text" id="filtre-stock" oninput="rendreInventaire()" placeholder="Rechercher un ID..." class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs w-44">
+                    </div>
+                    <div class="flex-1 overflow-y-auto border border-slate-100 rounded-xl">
+                        <table class="min-w-full divide-y divide-slate-100">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">ID Unique</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Matériel & Taille</th>
+                                    <th class="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">État</th>
+                                    <th class="px-6 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Statut</th>
+                                    <th class="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Utilisateur</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-inventaire" class="bg-white divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-white border-t border-slate-200 py-4 flex-shrink-0">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400 font-medium flex items-center justify-between">
+            <p>Hockey Stock Manager - Solution d'organisation en cascade</p>
+            <p class="flex items-center gap-1">Développé pour les clubs amateurs <i data-lucide="heart" class="w-3 h-3 text-red-500 fill-red-500"></i></p>
+        </div>
+    </footer>
+
+    <!-- LOGIQUE DE BASE DE DONNÉES CLOUD ET INTERFACE -->
+    <script type="module">
+        // Importation des SDK Firebase v11 (chargés de manière modulaire)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // =========================================================================
+        // ⚙️ CONFIGURATION FIREBASE CLOUD (VOTRE BASE DE DONNÉES DE REMISE)
+        // =========================================================================
+        let firebaseConfig = null;
+        
+        /* Exemple de configuration à copier-coller ci-dessus :
+        let firebaseConfig = {
+            apiKey: "AIzaSyD-xxx_example_apiKey",
+            authDomain: "hockey-remise-xxx.firebaseapp.com",
+            projectId: "hockey-remise-xxx",
+            storageBucket: "hockey-remise-xxx.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456:web:abcd1234efgh"
+        };
+        */
+        // =========================================================================
+
+        // Gestion de la récupération de la clé si injectée automatiquement par l'environnement
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            firebaseConfig = JSON.parse(__firebase_config);
+        }
+
+        // Variables de synchronisation d'état globales
+        let dbActive = false;
+        let db = null;
+        let auth = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'hockey-stock-prod';
+
+        // Base de données locale de repli (si Firebase n'est pas encore configuré)
+        let inventaire = [
+            { id: "CASQ-01", type: "casque", taille: "S", etat: "Neuf", statut: "Disponible", assigneA: null },
+            { id: "CASQ-02", type: "casque", taille: "M", etat: "Excellent état", statut: "Disponible", assigneA: null },
+            { id: "PLAS-01", type: "plastron", taille: "M", etat: "Bon état", statut: "Disponible", assigneA: null },
+            { id: "PLAS-02", type: "plastron", taille: "L", etat: "Usagé", statut: "Disponible", assigneA: null },
+            { id: "COUD-01", type: "coudieres", taille: "M", etat: "Excellent état", statut: "Disponible", assigneA: null },
+            { id: "CULO-01", type: "culotte", taille: "M", etat: "Neuf", statut: "Disponible", assigneA: null },
+            { id: "JAMB-01", type: "jambieres", taille: "9\"", etat: "Neuf", statut: "Disponible", assigneA: null },
+            { id: "JAMB-02", type: "jambieres", taille: "11\"", etat: "Excellent état", statut: "Disponible", assigneA: null },
+            { id: "JAMB-03", type: "jambieres", taille: "11\"", etat: "Bon état", statut: "Disponible", assigneA: null },
+            { id: "PATI-01", type: "patins", taille: "32", etat: "Bon état", statut: "Disponible", assigneA: null },
+            { id: "PATI-02", type: "patins", taille: "34", etat: "Excellent état", statut: "Disponible", assigneA: null },
+            { id: "PATI-03", type: "patins", taille: "34", etat: "Neuf", statut: "Disponible", assigneA: null },
+        ];
+
+        let adherents = [
+            { 
+                id: "adh-1", 
+                prenom: "Jean-Baptiste",
+                nom: "Richard",
+                dateDeNaissance: "2017-04-12",
+                categorie: "U9", 
+                tailles: { casque: "M", plastron: "M", coudieres: "M", culotte: "M", jambieres: "11\"", patins: "34" },
+                attribution: { casque: null, plastron: null, coudieres: null, culotte: null, jambieres: null, patins: null },
+                statut: "En attente",
+                dateHeureInscription: "27/06/2026 11:45"
+            }
+        ];
+
+        let adherentSelectionneId = null;
+        let html5QrCode = null;
+        let scanTypeCible = null;
+
+        // CALCUL DE LA CATEGORIE D'AGE (DEDUCTION AUTOMATIQUE)
+        function calculerCategorie(dobString) {
+            if (!dobString) return "";
+            const birthYear = new Date(dobString).getFullYear();
+            const currentYear = 2026; // Saison en cours 2026-2027
+            const ageDiff = currentYear - birthYear;
+
+            if (ageDiff <= 8) return "U9";
+            if (ageDiff <= 10) return "U11";
+            if (ageDiff <= 12) return "U13";
+            if (ageDiff <= 14) return "U15";
+            if (ageDiff <= 16) return "U17";
+            return "Loisirs / Seniors";
+        }
+
+        // Événement de saisie de la date de naissance pour afficher la catégorie à la volée
+        document.getElementById('c1-dob').addEventListener('input', (e) => {
+            const cat = calculerCategorie(e.target.value);
+            const catDisplay = document.getElementById('c1-cat-auto');
+            if (cat) {
+                catDisplay.textContent = `Catégorie : ${cat}`;
+                catDisplay.classList.remove('hidden');
+            } else {
+                catDisplay.textContent = "";
+                catDisplay.classList.add('hidden');
+            }
+        });
+
+        // INITIALISATION FIREBASE & AUTHENTIFICATION
+        async function setupDatabase() {
+            if (!firebaseConfig) {
+                console.log("Firebase n'est pas configuré. Utilisation du mode de stockage local.");
+                configurerModeLocal();
+                return;
+            }
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        dbActive = true;
+                        document.getElementById('db-indicator').className = "relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500";
+                        document.getElementById('db-ping').className = "animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75";
+                        document.getElementById('db-status-text').textContent = "Base Cloud connectée";
+                        
+                        ecouterCollectionsCloud();
+                    } else {
+                        configurerModeLocal();
+                    }
+                });
+
+            } catch (err) {
+                console.error("Échec d'initialisation Firebase :", err);
+                configurerModeLocal();
+            }
+        }
+
+        function configurerModeLocal() {
+            dbActive = false;
+            document.getElementById('db-indicator').className = "relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500";
+            document.getElementById('db-ping').classList.add('hidden');
+            document.getElementById('db-status-text').textContent = "Mode local temporaire";
+            rendreTout();
+        }
+
+        // ÉCOUTE DES MISES À ZONE EN TEMPS RÉEL (CLOUD -> INTERFACE)
+        function ecouterCollectionsCloud() {
+            if (!db || !dbActive) return;
+
+            const collectionAdherents = collection(db, 'artifacts', appId, 'public', 'data', 'adherents');
+            const collectionInventaire = collection(db, 'artifacts', appId, 'public', 'data', 'inventaire');
+
+            // Écoute de l'inventaire
+            onSnapshot(query(collectionInventaire), (snapshot) => {
+                let nouveauxElements = [];
+                snapshot.forEach(doc => {
+                    nouveauxElements.push({ id: doc.id, ...doc.data() });
+                });
+
+                if (nouveauxElements.length > 0) {
+                    inventaire = nouveauxElements;
+                } else {
+                    initBaseDonneesCloud();
+                }
+                rendreTout();
+            }, (error) => {
+                console.error("Erreur de synchronisation inventaire :", error);
+            });
+
+            // Écoute des adhérents
+            onSnapshot(query(collectionAdherents), (snapshot) => {
+                let nouveauxAdherents = [];
+                snapshot.forEach(doc => {
+                    nouveauxAdherents.push({ id: doc.id, ...doc.data() });
+                });
+                adherents = nouveauxAdherents;
+                rendreTout();
+                
+                if (adherentSelectionneId) {
+                    selectionnerAdherentC2(adherentSelectionneId);
+                }
+            }, (error) => {
+                console.error("Erreur de synchronisation adhérents :", error);
+            });
+        }
+
+        // Initialisation à la première connexion
+        async function initBaseDonneesCloud() {
+            for (const item of inventaire) {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventaire', item.id), {
+                    type: item.type,
+                    taille: item.taille,
+                    etat: item.etat,
+                    statut: item.statut,
+                    assigneA: item.assigneA
+                });
+            }
+        }
+
+        // ENREGISTREMENT ET INTERACTION DES DONNÉES
+        async function sauvegarderAdherentCloud(adherent) {
+            if (dbActive && db) {
+                try {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'adherents', adherent.id), {
+                        prenom: adherent.prenom,
+                        nom: adherent.nom,
+                        dateDeNaissance: adherent.dateDeNaissance,
+                        categorie: adherent.categorie,
+                        tailles: adherent.tailles,
+                        attribution: adherent.attribution,
+                        statut: adherent.statut,
+                        dateHeureInscription: adherent.dateHeureInscription
+                    });
+                } catch (e) {
+                    console.error("Erreur sauvegarde cloud adhérent", e);
+                }
+            }
+        }
+
+        async function sauvegarderEquipementCloud(item) {
+            if (dbActive && db) {
+                try {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventaire', item.id), {
+                        type: item.type,
+                        taille: item.taille,
+                        etat: item.etat,
+                        statut: item.statut,
+                        assigneA: item.assigneA
+                    });
+                } catch (e) {
+                    console.error("Erreur sauvegarde cloud matériel", e);
+                }
+            }
+        }
+
+        // --- CYCLE DE VIE ET RENDUS ---
+        window.addEventListener('DOMContentLoaded', () => {
+            genererOptionsPointures();
+            majChoixTaillesStock();
+            setupDatabase();
+            rendreTout();
+            lucide.createIcons();
+        });
+
+        function genererOptionsPointures() {
+            const selectEl = document.getElementById('c1-taille-patins');
+            if (selectEl) {
+                selectEl.innerHTML = '';
+                for (let i = 26; i <= 46; i++) {
+                    const opt = document.createElement('option');
+                    opt.value = i.toString();
+                    opt.textContent = i.toString();
+                    if (i === 34) opt.selected = true;
+                    selectEl.appendChild(opt);
+                }
+            }
+        }
+
+        function majChoixTaillesStock() {
+            const type = document.getElementById('st-type').value;
+            const selectTaille = document.getElementById('st-taille');
+            if (selectTaille) {
+                selectTaille.innerHTML = '';
+
+                let tailles = [];
+                if (type === 'casque' || type === 'coudieres') {
+                    tailles = ['XS', 'S', 'M', 'L'];
+                } else if (type === 'plastron' || type === 'culotte') {
+                    tailles = ['XS', 'S', 'M', 'L', 'XL'];
+                } else if (type === 'jambieres') {
+                    tailles = ['9"', '10"', '11"', '12"', '13"', '14"'];
+                } else if (type === 'patins') {
+                    for (let i = 26; i <= 46; i++) {
+                        tailles.push(i.toString());
+                    }
+                }
+
+                tailles.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t;
+                    opt.textContent = t;
+                    selectTaille.appendChild(opt);
+                });
+            }
+        }
+
+        function rendreTout() {
+            rendreFileAttente();
+            rendreListeAttenteComptoir2();
+            rendreInventaire();
+            calculerStatsInventaire();
+        }
+
+        function rendreFileAttente() {
+            const tbody = document.getElementById('tbody-file-attente');
+            const placeholder = document.getElementById('file-attente-vide');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            const enAttente = adherents.filter(a => a.statut !== 'Clôturé');
+            document.getElementById('badge-file-attente').textContent = `${enAttente.length} Adhérents`;
+
+            if (enAttente.length === 0) {
+                placeholder.classList.remove('hidden');
+                return;
+            } else {
+                placeholder.classList.add('hidden');
+            }
+
+            enAttente.forEach(a => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors text-xs";
+                
+                let elementsDistribués = 0;
+                Object.values(a.attribution).forEach(v => { if(v) elementsDistribués++; });
+
+                const badgeStatut = elementsDistribués === 0 
+                    ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full font-semibold bg-rose-50 text-rose-800 border border-rose-100">Aucun</span>`
+                    : `<span class="inline-flex items-center px-2 py-0.5 rounded-full font-semibold bg-amber-50 text-amber-800 border border-amber-100">${elementsDistribués}/6 remis</span>`;
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-bold text-slate-900">${a.prenom} ${a.nom}</div>
+                        <div class="text-[10px] font-semibold text-blue-600 uppercase tracking-widest">${a.categorie}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center text-slate-600">
+                        Casque: <strong>${a.tailles.casque}</strong> \| Plastron: <strong>${a.tailles.plastron}</strong><br>
+                        Coudières: <strong>${a.tailles.coudieres}</strong> \| Culotte: <strong>${a.tailles.culotte}</strong><br>
+                        Jamb: <strong>${a.tailles.jambieres}</strong> \| Patins: <strong>${a.tailles.patins}</strong>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">${a.dateHeureInscription || "-"}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">${badgeStatut}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="allerVersComptoir2('${a.id}')" class="text-blue-600 hover:text-blue-900 font-bold flex items-center space-x-1 ml-auto">
+                            <span>Distribuer</span>
+                            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        function rendreListeAttenteComptoir2() {
+            const container = document.getElementById('comptoir2-liste-attente');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            const actifs = adherents.filter(a => a.statut !== 'Clôturé');
+
+            if (actifs.length === 0) {
+                container.innerHTML = `<div class="text-center py-12 text-slate-400 text-sm">Aucun adhérent à servir.</div>`;
+                return;
+            }
+
+            actifs.forEach(a => {
+                let remis = 0;
+                Object.values(a.attribution).forEach(v => { if(v) remis++; });
+                const actifStyle = a.id === adherentSelectionneId ? 'border-blue-500 bg-blue-50/50' : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50';
+
+                const div = document.createElement('div');
+                div.className = `p-4 border-2 rounded-xl cursor-pointer transition-all ${actifStyle}`;
+                div.onclick = () => selectionnerAdherentC2(a.id);
+                div.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-400 tracking-wider">${a.categorie}</span>
+                        <span class="text-xs font-bold text-slate-500">${remis}/6 pièces</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-slate-900 mt-1">${a.prenom} ${a.nom}</h4>
+                    <div class="mt-2 flex items-center justify-between text-[10px] text-slate-400">
+                        <span>Le ${a.dateHeureInscription}</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function selectionnerAdherentC2(id) {
+            adherentSelectionneId = id;
+            const adherent = adherents.find(a => a.id === id);
+            if (!adherent) return;
+
+            document.getElementById('c2-aucun-selectionne').classList.add('hidden');
+            const panneau = document.getElementById('c2-panneau-distribution');
+            panneau.classList.remove('hidden');
+
+            document.getElementById('c2-focus-nom').textContent = `${adherent.prenom} ${adherent.nom}`;
+            document.getElementById('c2-focus-cat').textContent = adherent.categorie;
+            document.getElementById('c2-focus-heure').textContent = adherent.dateHeureInscription;
+
+            document.getElementById('c2-req-casque').textContent = adherent.tailles.casque;
+            document.getElementById('c2-req-plastron').textContent = adherent.tailles.plastron;
+            document.getElementById('c2-req-coudieres').textContent = adherent.tailles.coudieres;
+            document.getElementById('c2-req-culotte').textContent = adherent.tailles.culotte;
+            document.getElementById('c2-req-jambieres').textContent = adherent.tailles.jambieres;
+            document.getElementById('c2-req-patins').textContent = adherent.tailles.patins;
+
+            remplirSelectEquipements('casque', adherent.tailles.casque, 'c2-select-casque', adherent.attribution.casque);
+            remplirSelectEquipements('plastron', adherent.tailles.plastron, 'c2-select-plastron', adherent.attribution.plastron);
+            remplirSelectEquipements('coudieres', adherent.tailles.coudieres, 'c2-select-coudieres', adherent.attribution.coudieres);
+            remplirSelectEquipements('culotte', adherent.tailles.culotte, 'c2-select-culotte', adherent.attribution.culotte);
+            remplirSelectEquipements('jambieres', adherent.tailles.jambieres, 'c2-select-jambieres', adherent.attribution.jambieres);
+            remplirSelectEquipements('patins', adherent.tailles.patins, 'c2-select-patins', adherent.attribution.patins);
+
+            calculerProgressionDistribution(adherent);
+            
+            lucide.createIcons();
+        }
+
+        function remplirSelectEquipements(type, taille, selectId, idActuellementAssigne) {
+            const selectEl = document.getElementById(selectId);
+            if (!selectEl) return;
+            selectEl.innerHTML = '';
+
+            const optionsDispo = inventaire.filter(item => 
+                item.type === type && 
+                item.taille === taille && 
+                (item.statut === 'Disponible' || item.id === idActuellementAssigne)
+            );
+
+            if (optionsDispo.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = "";
+                opt.textContent = "❌ Rupture";
+                selectEl.appendChild(opt);
+                selectEl.disabled = true;
+                return;
+            }
+
+            selectEl.disabled = false;
+            
+            const optDefaut = document.createElement('option');
+            optDefaut.value = "";
+            optDefaut.textContent = "-- Manuel --";
+            selectEl.appendChild(optDefaut);
+
+            optionsDispo.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.id;
+                opt.textContent = `${item.id} (${item.etat})`;
+                if (item.id === idActuellementAssigne) {
+                    opt.selected = true;
+                }
+                selectEl.appendChild(opt);
+            });
+        }
+
+        // --- SCANNER QR CODE ---
+        function ouvrirScanner(type) {
+            scanTypeCible = type;
+            document.getElementById('scan-target-label').textContent = type.toUpperCase();
+            
+            const container = document.getElementById('c2-scanner-container');
+            container.classList.remove('hidden');
+
+            if (html5QrCode === null) {
+                html5QrCode = new window.Html5Qrcode("reader");
+            }
+
+            const qrCodeSuccessCallback = (decodedText) => {
+                gererResultatScan(decodedText);
+                fermerScanner();
+            };
+
+            const config = { fps: 10, qrbox: { width: 200, height: 200 } };
+
+            html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
+                .catch((err) => {
+                    showToast("Impossible d'accéder à la caméra de l'appareil.", "alert-triangle", "bg-rose-600");
+                    console.error(err);
+                    fermerScanner();
+                });
+        }
+
+        function fermerScanner() {
+            const container = document.getElementById('c2-scanner-container');
+            if (container) container.classList.add('hidden');
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop().then(() => {
+                    scanTypeCible = null;
+                }).catch(err => console.error(err));
+            }
+        }
+
+        function gererResultatScan(scannedId) {
+            if (!adherentSelectionneId || !scanTypeCible) return;
+            
+            const item = inventaire.find(i => i.id === scannedId);
+            const adherent = adherents.find(a => a.id === adherentSelectionneId);
+
+            if (!item) {
+                showToast(`Code scanné (${scannedId}) introuvable dans l'inventaire !`, "alert-triangle", "bg-rose-600");
+                return;
+            }
+
+            if (item.type !== scanTypeCible) {
+                showToast(`Erreur : L'ID ${scannedId} est un(e) ${item.type} et non un(e) ${scanTypeCible}.`, "alert-triangle", "bg-rose-600");
+                return;
+            }
+
+            if (item.taille !== adherent.tailles[scanTypeCible]) {
+                showToast(`Avertissement : Taille scannée (${item.taille}) différente du besoin (${adherent.tailles[scanTypeCible]}).`, "alert-triangle", "bg-amber-600");
+            }
+
+            if (item.statut === 'Attribué' && item.id !== adherent.attribution[scanTypeCible]) {
+                showToast(`Cet équipement est déjà attribué à ${item.assigneA} !`, "alert-triangle", "bg-rose-600");
+                return;
+            }
+
+            let selectId = `c2-select-${scanTypeCible}`;
+            const selectEl = document.getElementById(selectId);
+            
+            let optionExiste = false;
+            for (let i = 0; i < selectEl.options.length; i++) {
+                if (selectEl.options[i].value === scannedId) {
+                    selectEl.selectedIndex = i;
+                    optionExiste = true;
+                    break;
+                }
+            }
+
+            if (!optionExiste) {
+                const opt = document.createElement('option');
+                opt.value = item.id;
+                opt.textContent = `${item.id} (${item.etat})`;
+                opt.selected = true;
+                selectEl.appendChild(opt);
+            }
+
+            validerEquipement(scanTypeCible);
+        }
+
+        // --- ENREGISTREMENTS ACTIONS FORMULAIRES ET ETATS ---
+        async function validerEquipement(type) {
+            if (!adherentSelectionneId) return;
+            const adherent = adherents.find(a => a.id === adherentSelectionneId);
+            const selectId = `c2-select-${type}`;
+
+            const selectedId = document.getElementById(selectId).value;
+            const ancienIdAssigne = adherent.attribution[type];
+
+            if (ancienIdAssigne) {
+                const ancienItem = inventaire.find(i => i.id === ancienIdAssigne);
+                if (ancienItem) {
+                    ancienItem.statut = 'Disponible';
+                    ancienItem.assigneA = null;
+                    await sauvegarderEquipementCloud(ancienItem);
+                }
+            }
+
+            if (selectedId) {
+                const nouvelItem = inventaire.find(i => i.id === selectedId);
+                if (nouvelItem) {
+                    nouvelItem.statut = 'Attribué';
+                    nouvelItem.assigneA = `${adherent.prenom} ${adherent.nom}`;
+                    adherent.attribution[type] = selectedId;
+                    await sauvegarderEquipementCloud(nouvelItem);
+                    showToast(`Élément ${selectedId} attribué !`, "check", "bg-green-600");
+                }
+            } else {
+                adherent.attribution[type] = null;
+                showToast(`Attribution retirée.`, "info", "bg-slate-700");
+            }
+
+            adherent.statut = "En cours";
+            await sauvegarderAdherentCloud(adherent);
+            calculerProgressionDistribution(adherent);
+            rendreTout();
+        }
+
+        function calculerProgressionDistribution(adherent) {
+            let attribues = 0;
+            Object.values(adherent.attribution).forEach(v => { if (v) attribues++; });
+
+            const pourcentage = (attribues / 6) * 100;
+            document.getElementById('c2-barre-progression').style.width = `${pourcentage}%`;
+            document.getElementById('c2-texte-progression').textContent = `${attribues}/6 attribué(s)`;
+        }
+
+        async function cloturerDossierAdherent() {
+            if (!adherentSelectionneId) return;
+            const adherent = adherents.find(a => a.id === adherentSelectionneId);
+            
+            let attribues = 0;
+            Object.values(adherent.attribution).forEach(v => { if (v) attribues++; });
+
+            if (attribues === 0) {
+                showToast("Impossible de valider : aucun matériel n'a été attribué !", "alert-triangle", "bg-rose-600");
+                return;
+            }
+
+            adherent.statut = 'Clôturé';
+            await sauvegarderAdherentCloud(adherent);
+            showToast(`Dossier de ${adherent.prenom} ${adherent.nom} validé avec succès !`, "shield-check", "bg-emerald-600");
+            
+            adherentSelectionneId = null;
+            document.getElementById('c2-aucun-selectionne').classList.remove('hidden');
+            document.getElementById('c2-panneau-distribution').classList.add('hidden');
+            
+            rendreTout();
+        }
+
+        function rendreInventaire() {
+            const tbody = document.getElementById('tbody-inventaire');
+            if (!tbody) return;
+            const filtre = document.getElementById('filtre-stock').value.toLowerCase();
+            tbody.innerHTML = '';
+
+            const stockFiltre = inventaire.filter(i => i.id.toLowerCase().includes(filtre));
+
+            stockFiltre.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors text-sm";
+
+                const badgeEtat = `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                    item.etat === 'Neuf' ? 'bg-emerald-50 text-emerald-800' :
+                    item.etat === 'Excellent état' ? 'bg-blue-50 text-blue-800' :
+                    item.etat === 'Bon état' ? 'bg-slate-100 text-slate-800' : 'bg-rose-50 text-rose-800'
+                }">${item.etat}</span>`;
+
+                const badgeStatut = item.statut === 'Disponible'
+                    ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-800 border border-green-100">Disponible</span>`
+                    : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200">Attribué</span>`;
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap font-mono font-bold text-slate-700">${item.id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="capitalize font-semibold text-slate-900">${item.type}</div>
+                        <div class="text-xs text-slate-500">Taille : ${item.taille}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">${badgeEtat}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">${badgeStatut}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-slate-500 font-medium">
+                        ${item.assigneA ? `<span class="text-slate-800 font-bold">${item.assigneA}</span>` : '<span class="text-slate-300 italic">- Aucun -</span>'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        function calculerStatsInventaire() {
+            const total = inventaire.length;
+            const distribues = inventaire.filter(i => i.statut === 'Attribué').length;
+            const dispo = total - distribues;
+            const taux = total > 0 ? Math.round((distribues / total) * 100) : 0;
+
+            const elTotal = document.getElementById('stat-total');
+            const elDispo = document.getElementById('stat-dispo');
+            const elAttr = document.getElementById('stat-attribues');
+            const elTaux = document.getElementById('stat-taux');
+
+            if (elTotal) elTotal.textContent = total;
+            if (elDispo) elDispo.textContent = dispo;
+            if (elAttr) elAttr.textContent = distribues;
+            if (elTaux) elTaux.textContent = `${taux}%`;
+        }
+
+        async function enregistrerAdherent(e) {
+            e.preventDefault();
+            const nom = document.getElementById('c1-nom').value;
+            const prenom = document.getElementById('c1-prenom').value;
+            const dob = document.getElementById('c1-dob').value;
+            const cat = calculerCategorie(dob);
+            
+            const casque = document.getElementById('c1-taille-casque').value;
+            const plastron = document.getElementById('c1-taille-plastron').value;
+            const coudieres = document.getElementById('c1-taille-coudieres').value;
+            const culotte = document.getElementById('c1-taille-culotte').value;
+            const jambieres = document.getElementById('c1-taille-jambieres').value;
+            const patins = document.getElementById('c1-taille-patins').value;
+
+            // Date & Heure d'inscription (ex: "27/06/2026 15:42")
+            const dateHeure = new Date().toLocaleString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            const nouvelAdherent = {
+                id: `adh-${Date.now()}`,
+                prenom: prenom,
+                nom: nom,
+                dateDeNaissance: dob,
+                categorie: cat,
+                tailles: { casque, plastron, coudieres, culotte, jambieres, patins },
+                attribution: { casque: null, plastron: null, coudieres: null, culotte: null, jambieres: null, patins: null },
+                statut: "En attente",
+                dateHeureInscription: dateHeure
+            };
+
+            if (dbActive) {
+                await sauvegarderAdherentCloud(nouvelAdherent);
+            } else {
+                adherents.push(nouvelAdherent);
+            }
+            
+            showToast(`${prenom} ${nom} ajouté à la file !`, "user-plus", "bg-blue-600");
+            document.getElementById('form-inscription').reset();
+            document.getElementById('c1-cat-auto').classList.add('hidden');
+            genererOptionsPointures();
+            rendreTout();
+        }
+
+        async function ajouterEquipement(e) {
+            e.preventDefault();
+            const id = document.getElementById('st-id').value.trim().toUpperCase();
+            const type = document.getElementById('st-type').value;
+            const taille = document.getElementById('st-taille').value;
+            const etat = document.getElementById('st-etat').value;
+
+            if (inventaire.some(item => item.id === id)) {
+                showToast("Cet identifiant d'équipement existe déjà !", "alert-triangle", "bg-rose-600");
+                return;
+            }
+
+            const nouvelEquipement = { id, type, taille, etat, statut: "Disponible", assigneA: null };
+
+            if (dbActive) {
+                await sauvegarderEquipementCloud(nouvelEquipement);
+            } else {
+                inventaire.push(nouvelEquipement);
+            }
+            
+            showToast(`Équipement ${id} ajouté au stock actif.`, "check", "bg-emerald-600");
+            document.getElementById('form-stock').reset();
+            majChoixTaillesStock();
+            rendreTout();
+        }
+
+        function switchTab(tabId) {
+            document.getElementById('sec-comptoir1').classList.add('hidden');
+            document.getElementById('sec-comptoir2').classList.add('hidden');
+            document.getElementById('sec-inventaire').classList.add('hidden');
+
+            document.getElementById('tab-comptoir1').className = "border-b-2 border-transparent py-4 px-1 text-sm font-medium flex items-center space-x-2 transition-all text-slate-500 hover:text-slate-700 hover:border-slate-300";
+            document.getElementById('tab-comptoir2').className = "border-b-2 border-transparent py-4 px-1 text-sm font-medium flex items-center space-x-2 transition-all text-slate-500 hover:text-slate-700 hover:border-slate-300";
+            document.getElementById('tab-inventaire').className = "border-b-2 border-transparent py-4 px-1 text-sm font-medium flex items-center space-x-2 transition-all text-slate-500 hover:text-slate-700 hover:border-slate-300";
+
+            document.getElementById(`sec-${tabId}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabId}`).className = "tab-active border-b-2 border-transparent py-4 px-1 text-sm font-medium flex items-center space-x-2 transition-all";
+            
+            fermerScanner();
+            rendreTout();
+        }
+
+        function allerVersComptoir2(adherentId) {
+            switchTab('comptoir2');
+            selectionnerAdherentC2(adherentId);
+        }
+
+        // Liaison des fonctions au scope global window pour les clics HTML
+        window.switchTab = switchTab;
+        window.enregistrerAdherent = enregistrerAdherent;
+        window.ouvrirScanner = ouvrirScanner;
+        window.fermerScanner = fermerScanner;
+        window.validerEquipement = validerEquipement;
+        window.cloturerDossierAdherent = cloturerDossierAdherent;
+        window.ajouterEquipement = ajouterEquipement;
+        window.rendreInventaire = rendreInventaire;
+        window.allerVersComptoir2 = allerVersComptoir2;
+        window.majChoixTaillesStock = majChoixTaillesStock;
+    </script>
+</body>
+</html>
